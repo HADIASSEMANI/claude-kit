@@ -1,7 +1,7 @@
 ---
 name: savvy-flow
 description: Orchestrated delivery flow. The session model plans, owns design, delegates implementation to tiered worker subagents (savvy-fable / savvy-heavy / savvy-careful / savvy-medium / savvy-light) and adversarially reviews their output. Invoke with /savvy-flow <task>.
-disable-model-invocation: true
+disable-model-invocation: false
 argument-hint: <task description>
 ---
 
@@ -14,7 +14,7 @@ Task from the user: $ARGUMENTS
 ## 0. Preconditions
 
 - The flow is designed for a strong orchestrator model at high effort (Fable high is the reference setup). Do not try to detect or verify the session's model or effort — you cannot see the effort level. Whatever the session runs on is the user's deliberate choice; just orchestrate.
-- Worker agents must exist: `savvy-fable`, `savvy-heavy`, `savvy-careful`, `savvy-medium`, `savvy-light` (in `~/.claude/agents/`, or shipped with the savvy-flow plugin, in which case the Agent tool lists them as `savvy-flow:savvy-careful` and so on). If the Agent tool does not list them, stop and tell the user.
+- Worker agents must exist: `savvy-fable`, `savvy-heavy`, `savvy-careful`, `savvy-medium`, `savvy-light`, plus external relays `savvy-agy` and `savvy-codex` (in `~/.claude/agents/`, or shipped with the savvy-flow plugin, in which case the Agent tool lists them as `savvy-flow:savvy-careful` and so on). If the Agent tool does not list them, stop and tell the user.
 
 ## Progress bar
 
@@ -70,10 +70,21 @@ Pick the cheapest tier that will get the task right the first time. Two axes: **
 | Tier | Agent | Model / effort | Use for |
 |------|-------|----------------|---------|
 | Fable | `savvy-fable` | Fable / high | "Hardest problems": very complex logic (subtle algorithms, concurrency, many interacting states), hard bugs that resist ordinary debugging or survived a Heavy investigation; targeted design features, only when the user asks (section 2) |
-| Heavy | `savvy-heavy` | Opus / xhigh | "Understand and find": unfamiliar or messy code, unclear root cause, non-obvious architecture, large contexts, anything where a wrong first approach is expensive |
+| Heavy | `savvy-heavy` | Opus / high | "Understand and find": unfamiliar or messy code, unclear root cause, non-obvious architecture, large contexts, anything where a wrong first approach is expensive |
 | Careful | `savvy-careful` | Opus / high | "Do it right": the approach is clear but execution is delicate. Multi-file refactors, fixes that must preserve invariants, logic with many edge cases, concurrency |
 | Medium | `savvy-medium` | Opus / medium | Standard feature work, bug fixes with a known cause, changes confined to a few files with clear requirements |
 | Light | `savvy-light` | Opus / low | Mechanical edits, renames, boilerplate, config, small isolated fixes, running builds/tests and reporting |
+| agy | `savvy-agy` | Gemini Argon low; `Tier: hard` → Argon medium; `Tier: basic` → Flash high; Argon out of quota → agy Sonnet 5.5 medium / `Tier: hard` Opus 5.5 high (external; Haiku relay) | Standard implementation, tests, fixtures, docs, refactors confined to a few files, image/asset generation. `Tier: basic` only when acceptance is 100% machine-checkable. On Argon quota error retries on agy Claude (billed to agy's Google quota, not the Claude plan), then Codex Terra |
+| Codex | `savvy-codex` | gpt-6.1-terra low; `Tier: hard` → gpt-6.1-sol high (external; Haiku relay) | Bounded bug fixes with a known area, read-only investigations, scripts/asset pipelines, test writing, agy fallback; default external worker while Argon is out of quota. Sol high is cost-efficient: use `Tier: hard` freely, as you would `savvy-careful` (Opus high) |
+
+**Routing across providers (always on, no usage threshold).** You are the project manager for three model families; spread work so no single provider's quota carries everything:
+- Default implementation work that a brief can fully specify → `savvy-agy` or `savvy-codex` (alternate between them for parallel tasks; Codex for investigation/scripts, agy for feature code/tests/assets).
+- **User preference (2026-11-04): spend agy and Codex first, conserve Claude usage.** External workers are the default for any task they can do, including investigation and debugging with a precise brief. Claude tiers only for design-sensitive work, tasks needing a live GUI/app run (external sandboxes cannot launch apps), or after an external worker failed twice.
+- Claude tiers (`savvy-light`…`savvy-fable`) for work where Claude's judgment matters: unfamiliar/messy code, delicate invariants or concurrency, multi-file refactors, root-cause debugging, anything design-adjacent, and any task an external worker failed twice.
+- External workers are sandboxed (no network, workspace writes only) and cannot install deps: install/fetch first yourself or give that step to a Claude tier.
+- **Model choice (benchmarked 2026-11-06):** put a `Tier:` line in every external brief (none = default, `Tier: hard`, `Tier: basic` for agy Flash). Argon's quota is exhausted until ~2026-11-10 14:30 EST: until then add an `Argon: out` line to agy briefs so `savvy-agy` runs agy's Claude models (Sonnet 5.5 medium default, Opus 5.5 high for `Tier: hard`), which use agy's own Google quota, not the Claude plan (verified 2026-11-06); alternate with `savvy-codex` (Terra matched Sol on all benchmark tasks and was fastest). Escalation: Flash → Terra → Argon low (or agy Sonnet 5.5) → Argon medium (or agy Opus 5.5 high) → Sol 6.1 high → Claude tiers. GPT-OSS 120B in agy is unbenchmarked: do not use it yet. Never request xhigh/max effort from external workers: benchmarks show no gain over high on any provider.
+- Their briefs must name the absolute project path, allowed files, acceptance criteria and exact verification commands (they never see this conversation or CLAUDE.md unless the repo has it).
+- Review external results exactly like Claude workers (section 5): read the diff, rerun the tests. First confirm the diff exists: benchmarked workers have claimed "tests pass" with nothing changed.
 
 Heuristics:
 - Uncertain between two tiers → take the higher one. Exception: Fable is a reserve tier; pick it only when the task clearly meets its criteria, otherwise Heavy.
