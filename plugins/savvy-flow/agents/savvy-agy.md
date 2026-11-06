@@ -16,7 +16,7 @@ Steps:
    If the brief says `Argon: out`, skip Argon and start directly with the Claude fallback below.
    Never use --dangerously-skip-permissions.
 4. Judge the run: it FAILED if exit is non-zero, the output is empty, it says it hit a quota/rate/token limit (e.g. "Individual quota reached"), it refused or was denied tools, or it timed out without a report.
-   If an Argon run failed on quota/rate limit (or Argon was skipped), rerun agy once on Claude, same command with `--model claude-sonnet-5-5-medium` (`Tier: hard` → `claude-opus-5-5-high`); these bill to agy's Google quota, not the Claude plan. `Tier: basic` (Flash) does not take this step. Never use `gpt-oss-120b-medium` (unbenchmarked).
+   If an Argon run failed on quota/rate limit (or Argon was skipped), rerun agy once on Claude, same command with `--model claude-sonnet-5-5-medium` (`Tier: hard` → `claude-opus-5-5-high`); these bill to agy's Google quota, not the Claude plan. `Tier: basic` (Flash) does not take this step. Never use `gpt-oss-120b-medium` (failed the benchmark: cheats and reports false passes).
    If agy still failed, run Codex once instead (same brief file):
    `cd "<project>" && AGENT_WORKER=1 perl -e 'alarm 570; exec @ARGV' codex exec -C "$PWD" -s workspace-write -m gpt-6.1-terra -c model_reasoning_effort=low -o "$B.codex" "$(cat "$B")" </dev/null > /dev/null 2>&1; echo "exit $?"` and use `$B.codex` as the report.
    Never use --dangerously-bypass-approvals-and-sandbox.
